@@ -325,4 +325,27 @@ bool myMesh::triangulate(myFace* f)
 
 void myMesh::simplify() {
 	
+	for (myVertex* v : vertices) {
+		myVertex* v2 = v->originof->next->source;
+
+		// millieux des deux points
+		myPoint3D* ve = new myPoint3D();
+		*ve = *(v->point) + *(v2->point);
+		*ve /= 2;
+
+		// on bouge les deux points vers le millieu
+		v->point = ve;
+
+		// change les orgiineof de v2 pour les mettre sur ve
+		for (myHalfedge* h : halfedges) {
+			if (h->source == v2) {
+				h->source = v;
+			}
+		}
+
+
+
+		break;
+	}
+
 }
