@@ -321,3 +321,8 @@ bool myMesh::triangulate(myFace* f)
 
 	return true;
 }
+
+
+void myMesh::simplify() {
+	
+}

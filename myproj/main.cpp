@@ -165,6 +165,13 @@ void menu(int item)
 			exit(0);
 			break;
 		}
+	case MENU_SIMPLIFY:
+		{
+			m->simplify();
+			m->computeNormals();
+			makeBuffers(m);
+			break;
+		}
 	}
 	glutPostRedisplay();
 }
@@ -382,7 +389,8 @@ void initMesh()
 	closest_face = NULL;
 
 	m = new myMesh();
-	if (m->readFile("dolphin.obj")) {
+	//if (m->readFile("dolphin.obj")) {
+	if (m->readFile("cube.obj")) {
 		m->computeNormals();
 		makeBuffers(m);
 	}

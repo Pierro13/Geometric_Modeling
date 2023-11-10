@@ -29,6 +29,8 @@ public:
 	void triangulate();
 	bool triangulate(myFace *);
 
+	void simplify();
+
 	void clear();
 
 	myMesh(void);
