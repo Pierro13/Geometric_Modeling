@@ -26,6 +26,7 @@ public:
   myVector3D operator-(myVector3D & v1);
   myVector3D operator*(double s);
   myVector3D operator/(double s);
+  bool operator!=(const myVector3D& rhs) const;
   void crossproduct(myVector3D &, myVector3D &);
   myVector3D crossproduct(myVector3D &);
   void setNormal(myPoint3D *p1, myPoint3D *p2, myPoint3D *p3);

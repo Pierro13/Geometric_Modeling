@@ -44,9 +44,166 @@ void myMesh::checkMesh()
 	else cout << "Each edge has a twin!\n";
 }
 
+void myMesh::checkVertices() {
+	for (auto vertex : vertices) {
+		if (vertex->originof == NULL) {
+			cout << "Error! Vertex does not have an originating halfedge!\n";
+			return;
+		}
+	}
+	cout << "All vertices have an originating halfedge!\n";
+}
 
-bool myMesh::readFile(std::string filename)
+void myMesh::checkFaces() {
+	for (auto face : faces) {
+		if (face->adjacent_halfedge == NULL) {
+			cout << "Error! Face does not have an adjacent halfedge!\n";
+			return;
+		}
+	}
+	cout << "All faces have an adjacent halfedge!\n";
+}
+
+void myMesh::checkEdgeConnectivity() {
+	for (auto edge : halfedges) {
+		if (edge->next == NULL || edge->prev == NULL) {
+			cout << "Error in edge connectivity!\n";
+			return;
+		}
+	}
+	cout << "Edge connectivity is correct!\n";
+}
+
+void myMesh::checkNormalsConsistency() {
+
+	for (auto face : faces) {
+		myHalfedge* startEdge = face->adjacent_halfedge;
+		myHalfedge* currentEdge = startEdge;
+		myVector3D normal = myVector3D(0.0, 0.0, 0.0);
+		int cpt = 0;
+
+		do {
+			cpt++;
+			normal += *(currentEdge->source->normal);
+			currentEdge = currentEdge->next;
+		} while (currentEdge != startEdge);
+
+		normal = normal / (float)cpt;
+
+		if (normal != *(face->normal)) {
+			cout << "Error in face normal!\n";
+			return;
+		}
+		else {
+			cout << "Face normal is correct!\n";
+		}
+	}
+}
+
+double myMesh::longueur(myHalfedge* he)
 {
+	myPoint3D* p1 = he->source->point;
+	myPoint3D* p2 = he->next->source->point;
+	return p1->dist(*p2);
+}
+
+void myMesh::simplification()
+{
+	if (faces.size() <= 4) { return; } // regarde si on a au moins 4 faces
+
+	// check de l halfedge le plus petit
+	myHalfedge* h1 = halfedges[0];
+	for (myHalfedge* heCheck : halfedges) { if (longueur(heCheck) < longueur(h1)) { h1 = heCheck; } }
+
+	// calcul du point du milieu de lhalfedges
+	myVertex* v2 = h1->next->source;
+	myPoint3D* ve = new myPoint3D();
+	*ve = *(h1->source->point) + *(v2->point);
+	*ve /= 2;
+
+	h1->source->point = ve;
+
+	// Changer le point d'accroche de chaque halfedges autour de v2->originOf
+	// en utiisant twin->next
+	myHalfedge* vSS = h1;
+	myHalfedge* vPP = v2->originof;
+	do
+	{
+		vPP->source = vSS->source;
+		vPP = vPP->twin->next;
+	} while (vPP != v2->originof);
+
+	// changer les next et prev pour mes next et prev et les next et prev de mon twin
+	h1->source->originof = h1->next;
+
+	h1->next->prev = h1->prev;
+	h1->prev->next = h1->next;
+
+	h1->twin->next->prev = h1->twin->prev;
+	h1->twin->prev->next = h1->twin->next;
+
+	h1->adjacent_face->adjacent_halfedge = h1->next;
+	h1->twin->adjacent_face->adjacent_halfedge = h1->twin->next;
+
+	// supprimer le halfedge et son twin et son 2eme point
+	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), h1->twin), halfedges.end());
+	halfedges.erase(std::remove(halfedges.begin(), halfedges.end(), h1), halfedges.end());
+	vertices.erase(std::remove(vertices.begin(), vertices.end(), v2), vertices.end());
+
+	// Gestion du cas ou on a une figure inconcevable cest a dire une face de 2 halfedges
+	// initialiser un vecteur pour stocker les halfedges qu'on doit supprimer
+	vector<myHalfedge*> ttt;
+
+
+	for (myHalfedge* h : halfedges)
+	{
+		// Si en faisant next -> next je retombe sur moi meme alors 2 halfedges
+		if (h->next->next == h)
+		{
+			for (myVertex* v : vertices)
+			{
+				// pour les vertices qui ont comme originOf moi meme ou mon next,
+				// vous prenez quelqu'un d'autre
+				if (v->originof == h)
+				{
+					v->originof = h->twin->next;
+				}
+				else if (v->originof == h->next)
+				{
+					v->originof = h->next->twin->next;
+				}
+			}
+
+			// Etape de transformation de deux halfedges en 1 (assimilation)
+			h->twin->twin = h->next->twin;
+			h->next->twin->twin = h->twin;
+			ttt.push_back(h);
+			ttt.push_back(h->next);
+
+			// suppression de la face entre les deux halfedges
+			faces.erase(std::remove(faces.begin(), faces.end(), h->adjacent_face), faces.end());
+		}
+	}
+
+	// suppression des halfedges qui sont dans la liste des halfedges a supprimer
+	halfedges.erase(std::remove_if(halfedges.begin(), halfedges.end(), [ttt](myHalfedge* hhh) {if (count(ttt.begin(), ttt.end(), hhh))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}}), halfedges.end());
+
+	checkMesh();
+	checkVertices();
+	checkFaces();
+	checkEdgeConnectivity();
+
+}
+
+
+bool myMesh::readFile(string filename) {
 	string s, t, u;
 	vector<int> faceids;
 	myHalfedge** hedges;
@@ -58,95 +215,100 @@ bool myMesh::readFile(std::string filename)
 	}
 	name = filename;
 
+	string obj_name;
+
+	size_t lastSlash = filename.find_last_of("\\/");
+	if (lastSlash != string::npos)
+		obj_name = filename.substr(lastSlash + 1);
+	else obj_name = filename;
+
+	cout << "Reading file " << obj_name << "\n\n";
+
 	map<pair<int, int>, myHalfedge*> twin_map;
 	map<pair<int, int>, myHalfedge*>::iterator it;
 
-	while (getline(fin, s))
-	{
+	while (getline(fin, s)) {
 		stringstream myline(s);
 		myline >> t;
 		if (t == "g") {}
-		else if (t == "v") //todo
-		{
-			float x, y, z;
-			myline >> x >> y >> z;
-			//cout << "v " << x << " " << y << " " << z << endl;
-
+		else if (t == "v") {
+			float coords[3];
+			for (int i = 0; i < 3; ++i) myline >> coords[i];
 			myVertex* v = new myVertex();
-			v->point = new myPoint3D(x, y, z);
+			v->point = new myPoint3D(coords[0], coords[1], coords[2]);
 			vertices.push_back(v);
 		}
 		else if (t == "mtllib") {}
 		else if (t == "usemtl") {}
 		else if (t == "s") {}
-		else if (t == "f") //todo
-		{
-			//cout << endl;
-			//cout << "f";
+		else if (t == "f") {
 			while (myline >> u) {
 				int vertexIndex = atoi((u.substr(0, u.find("/"))).c_str());
-				//cout << " " << vertexIndex;
-				faceids.push_back(vertexIndex); // list of the vertex index
+				faceids.push_back(vertexIndex);
 			}
 
-			if (faceids.size() < 3) continue;
-
-			hedges = new myHalfedge * [faceids.size()];
-			for (int i = 0; i < faceids.size(); i++) hedges[i] = new myHalfedge();
-
-			myFace* face = new myFace();
-			face->adjacent_halfedge = hedges[0];
-
-			for (unsigned int i = 0; i < faceids.size(); i++) {
-				int iplusone = (i + 1) % faceids.size();
-				int iminusone = (i - 1 + faceids.size()) % faceids.size();
-
-				myHalfedge* next = hedges[iplusone]; //new myHalfedge();
-				myHalfedge* prev = hedges[iminusone];
-
-				//hedges[i]->index = faceids[i];
-				hedges[i]->source = vertices[faceids[i] - 1];
-				hedges[i]->next = next;
-				hedges[i]->prev = prev;
-				hedges[i]->adjacent_face = face;
-				hedges[i]->source->originof = hedges[i];
-
-				it = twin_map.find(make_pair(faceids[iplusone], faceids[i]));
-				if (it == twin_map.end()) {
-					// This means there was no myHalfedge* present at location(a, b)
-					twin_map[make_pair(faceids[i], faceids[iplusone])] = hedges[i];
-				}
-				else {
-					// It was found.The variable it->second is of type myHalfedge* is the halfedge present at location(a, b)
-					hedges[i]->twin = it->second;
-					it->second->twin = hedges[i];
-					twin_map.erase(it);
+			int taille = faceids.size();
+			if (taille >= 3) { 
+				hedges = new myHalfedge * [taille];
+				int a = 0;
+				while (a < taille) {
+					hedges[a] = new myHalfedge();
+					a++;
 				}
 
-				halfedges.push_back(hedges[i]);
+				myFace* face = new myFace();
+				face->adjacent_halfedge = hedges[0];
+
+				for (unsigned int i = 0; i < taille; i++) {
+					int i_plus = (i + 1) % taille;
+					int i_moins = (i - 1 + taille) % taille;
+
+					myHalfedge* next = hedges[i_plus];
+					myHalfedge* prev = hedges[i_moins];
+
+					hedges[i]->next = next;
+					hedges[i]->prev = prev;
+					hedges[i]->adjacent_face = face;
+					hedges[i]->source = vertices[faceids[i] - 1];
+					hedges[i]->source->originof = hedges[i];
+
+					it = twin_map.find(make_pair(faceids[i_plus], faceids[i]));
+					if (it != twin_map.end()) {
+						hedges[i]->twin = it->second;
+						it->second->twin = hedges[i];
+						twin_map.erase(it);
+					}
+					else {
+						twin_map[make_pair(faceids[i], faceids[i_plus])] = hedges[i];
+					}
+
+					halfedges.push_back(hedges[i]);
+				}
+				faces.push_back(face);
+				faceids.clear();
 			}
-			faces.push_back(face);
-
-			faceids.clear();
 		}
 	}
 
 	checkMesh();
+	checkVertices();
+	checkFaces();
+	checkEdgeConnectivity();
 	normalize();
+
+	cout << "\nReading file done!\n";
+	cout << "------------------\n";
 
 	return true;
 }
 
 
-void myMesh::computeNormals()
+void myMesh::computeNormals() // do with M. Pluta in TP
 {
-	/**** TODO ****/
-	// compute the normal of each face
 	for (myFace* f : faces) {
 		f->computeNormal();
 	}
 
-	// compute the normal of each vertex
 	for (myVertex* v : vertices) {
 		v->computeNormal();
 	}
@@ -212,29 +374,29 @@ void myMesh::subdivisionCatmullClark()
 
 myVertex* myMesh::gravityCenter(myFace* f)
 {
-	myVertex* centroid = new myVertex();
-	centroid->point = new myPoint3D();
+	myVertex* centre_de_gravite = new myVertex();
+	centre_de_gravite->point = new myPoint3D();
 
-	myHalfedge* startEdge = f->adjacent_halfedge;
-	myHalfedge* currentEdge = startEdge;
+	myHalfedge* start_Edge = f->adjacent_halfedge;
+	myHalfedge* current_Edge = start_Edge;
 	int cpt = 0;
 	do {
-		*(centroid->point) += *(currentEdge->source->point);
+		*(centre_de_gravite->point) += *(current_Edge->source->point);
 		cpt++;
 
-		currentEdge = currentEdge->next;
+		current_Edge = current_Edge->next;
 
-	} while (currentEdge != startEdge);
+	} while (current_Edge != start_Edge);
 
-	*(centroid->point) /= cpt;
+	*(centre_de_gravite->point) /= cpt;
 
-	return centroid;
+	return centre_de_gravite;
 }
 
 void myMesh::triangulate()
 {
 	// save all the faces in a vector
-	std::vector<myFace*> savedFaces;
+	vector<myFace*> savedFaces;
 	for (myFace* f : faces) {
 		savedFaces.push_back(f);
 	}
@@ -247,79 +409,76 @@ void myMesh::triangulate()
 
 	cout << "triangulate done" << endl;
 	checkMesh();
+	checkVertices();
+	checkFaces();
+	checkEdgeConnectivity();
 }
 
 //return false if already triangle, true othewise.
 bool myMesh::triangulate(myFace* f)
 {
-	// check if the face is already a triangle, if yes return false
-	if (f->adjacent_halfedge->next->next->next == f->adjacent_halfedge) {
-		return false;
+	if (f->adjacent_halfedge->next->next->next != f->adjacent_halfedge) {
+		myVertex* centre_de_gravite = gravityCenter(f);
+		vertices.push_back(centre_de_gravite);
+
+		myHalfedge* start_Edge = f->adjacent_halfedge;
+		myHalfedge* current_Edge = start_Edge;
+		myHalfedge* old_edge = current_Edge;
+		myHalfedge* twin;
+
+		bool running = true;
+		do {
+			old_edge = old_edge->next;
+
+			myFace* triangleFace = new myFace();
+			triangleFace->adjacent_halfedge = current_Edge;
+
+			myHalfedge* center_actual = new myHalfedge();
+			myHalfedge* next_center = new myHalfedge();
+
+			center_actual->source = centre_de_gravite;
+			center_actual->next = current_Edge;
+			center_actual->prev = next_center;
+			center_actual->adjacent_face = triangleFace;
+			center_actual->source->originof = center_actual;
+
+			next_center->source = current_Edge->next->source;
+			next_center->next = center_actual;
+			next_center->prev = current_Edge;
+
+			next_center->adjacent_face = triangleFace;
+			next_center->source->originof = next_center;
+
+			if (!(current_Edge == start_Edge)) {
+				center_actual->twin = twin;
+				twin->twin = center_actual;
+			}
+
+			twin = next_center;
+
+			current_Edge->next = next_center;
+			current_Edge->prev = center_actual;
+			current_Edge->adjacent_face = triangleFace;
+
+			halfedges.push_back(center_actual);
+			halfedges.push_back(next_center);
+			faces.push_back(triangleFace);
+
+			running = false;
+			current_Edge = old_edge;
+
+		} while (!(current_Edge == start_Edge));
+
+		start_Edge->prev->twin = twin;
+		twin->twin = start_Edge->prev;
+
+		faces.erase(remove(faces.begin(), faces.end(), f), faces.end());
+		delete f;
+
+		return true;
 	}
 
-	myVertex* centroid = gravityCenter(f);
-	vertices.push_back(centroid);
-
-	myHalfedge* startEdge = f->adjacent_halfedge;
-	myHalfedge* currentEdge = startEdge;
-	myHalfedge* savedEdge = currentEdge;
-	myHalfedge* twinEdge;
-	bool running = true;
-	do {
-		savedEdge = savedEdge->next;
-		//myHalfedge* savedNextEdge = currentEdge->next->next;
-
-		// create a new face
-		myFace* triangleFace = new myFace();
-		triangleFace->adjacent_halfedge = currentEdge;
-
-		//// create a new halfedge
-		myHalfedge* centerToCurrent = new myHalfedge();
-		myHalfedge* NextToCenter = new myHalfedge();
-
-		// fill the new halfedges comming from the centroid to the current edge
-		centerToCurrent->source = centroid;
-		centerToCurrent->next = currentEdge;
-		centerToCurrent->prev = NextToCenter;
-		centerToCurrent->adjacent_face = triangleFace;
-		centerToCurrent->source->originof = centerToCurrent;
-
-		// fill the new halfedges comming from the current edge to the centroid
-		NextToCenter->source = currentEdge->next->source;
-		NextToCenter->next = centerToCurrent;
-		NextToCenter->prev = currentEdge;
-		NextToCenter->adjacent_face = triangleFace;
-		NextToCenter->source->originof = NextToCenter;
-
-		// update the twin of the current edge
-		if (currentEdge != startEdge) {
-			centerToCurrent->twin = twinEdge;
-			twinEdge->twin = centerToCurrent;
-		}
-		twinEdge = NextToCenter;
-
-
-		// update the current edge
-		currentEdge->next = NextToCenter;
-		currentEdge->prev = centerToCurrent;
-		currentEdge->adjacent_face = triangleFace;
-
-		halfedges.push_back(centerToCurrent);
-		halfedges.push_back(NextToCenter);
-		faces.push_back(triangleFace);
-
-		running = false;
-		currentEdge = savedEdge;
-	} while (/*running*/currentEdge != startEdge);
-
-	startEdge->prev->twin = twinEdge;
-	twinEdge->twin = startEdge->prev;
-
-	// delete the old face
-	faces.erase(std::remove(faces.begin(), faces.end(), f), faces.end());
-	delete f;
-
-	return true;
+	return false;
 }
 
 

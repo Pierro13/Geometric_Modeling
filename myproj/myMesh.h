@@ -14,6 +14,12 @@ public:
 	std::string name;
 
 	void checkMesh();
+	void checkVertices();
+	void checkFaces();
+	void checkEdgeConnectivity();
+	void checkNormalsConsistency();
+	double longueur(myHalfedge* he);
+	void simplification();
 	bool readFile(std::string filename);
 	void computeNormals();
 	void normalize();

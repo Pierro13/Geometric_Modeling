@@ -49,6 +49,11 @@ myVector3D myVector3D::operator/(double s)
 	return myVector3D(dX/s, dY/s, dZ/s);
 }
 
+bool myVector3D::operator!=(const myVector3D& rhs) const {
+	const double EPSILON = 1e-8;
+	return (fabs(dX - rhs.dX) > EPSILON || fabs(dY - rhs.dY) > EPSILON || fabs(dZ - rhs.dZ) > EPSILON);
+}
+
 void myVector3D::crossproduct(myVector3D & v1, myVector3D & v2)
 {
 	dX = v1.dY * v2.dZ - v1.dZ * v2.dY;

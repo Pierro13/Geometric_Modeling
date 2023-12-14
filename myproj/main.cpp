@@ -93,11 +93,11 @@ void menu(int item)
 			for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 			{
 				myHalfedge *e = (*it);
-				myVertex *v1 = (*it)->source;
+				myVertex *v_1 = (*it)->source;
 				if ((*it)->twin == NULL) continue;
-				myVertex *v2 = (*it)->twin->source;
+				myVertex *v_2 = (*it)->twin->source;
 
-				double d = pickedpoint->dist(v1->point, v2->point);
+				double d = pickedpoint->dist(v_1->point, v_2->point);
 				if (d < min) { min = d; closest_edge = e; } 
 			}
 			break;
@@ -260,15 +260,15 @@ void display()
 		vector <GLuint> silhouette_edges;
 		for (vector<myHalfedge *>::iterator it = m->halfedges.begin(); it != m->halfedges.end(); it++)
 		{
-			/**** TODO: WRITE CODE TO COMPUTE SILHOUETTE ****/
 			myHalfedge *e = (*it);
-			myVertex *v1 = (*it)->source;
-			if ((*it)->twin == NULL) continue;
-			myVertex *v2 = (*it)->twin->source;
-			
+			myVertex *v_1 = (*it)->source;
+			if (NULL == (*it)->twin) {
+				continue;
+			}
+			myVertex *v_2 = (*it)->twin->source;
 
 			myVector3D camera_eye_vector(camera_eye.X, camera_eye.Y, camera_eye.Z);
-			myVector3D c1(v1->point->X, v1->point->Y, v1->point->Z);
+			myVector3D c1(v_1->point->X, v_1->point->Y, v_1->point->Z);
 
 			myVector3D q = camera_eye_vector - c1;
 			
@@ -279,8 +279,8 @@ void display()
 
 			if (s1 * s2 < 0)
 			{
-				silhouette_edges.push_back(v1->index);
-				silhouette_edges.push_back(v2->index);
+				silhouette_edges.push_back(v_1->index);
+				silhouette_edges.push_back(v_2->index);
 			}
 		}
 

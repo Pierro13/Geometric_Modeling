@@ -15,7 +15,7 @@ myFace::~myFace(void)
 	if (normal) delete normal;
 }
 
-void myFace::computeNormal()
+void myFace::computeNormal() // do with M. Pluta in TP
 {
 	myHalfedge* edge = this->adjacent_halfedge;
 	myHalfedge* next = edge->next;

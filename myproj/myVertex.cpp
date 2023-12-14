@@ -15,7 +15,7 @@ myVertex::~myVertex(void)
 	if (normal) delete normal;
 }
 
-void myVertex::computeNormal()
+void myVertex::computeNormal() // do with M. Pluta in TP
 {
 	myHalfedge* startEdge = originof;
 	myHalfedge* currentEdge = startEdge;
